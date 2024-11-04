@@ -8,7 +8,7 @@ import (
 func main() {
 	e := echo.New()
 
-	e.POST("/tasks", handlers.AddTodo)
+	e.POST("/tasks", handlers.HandleAdd)
 
 	e.Logger.Fatal(e.Start(":1234"))
 }

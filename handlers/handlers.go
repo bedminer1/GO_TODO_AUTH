@@ -7,7 +7,7 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-func AddTodo(c echo.Context) error {
+func HandleAdd(c echo.Context) error {
 	task := c.FormValue("task")
 	urgency := c.FormValue("urgency")
 
@@ -16,4 +16,13 @@ func AddTodo(c echo.Context) error {
 		return err
 	}
 	return c.JSON(http.StatusCreated, newTask)
+}
+
+func HandleComplete(c echo.Context) error {
+	task := todo.Task{}
+	return c.JSON(http.StatusOK, task)
+}
+
+func HandleDelete(c echo.Context) error {
+	return c.NoContent(http.StatusNoContent)
 }
