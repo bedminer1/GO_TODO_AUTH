@@ -9,7 +9,7 @@ import (
 
 func AddTodo(c echo.Context) error {
 	task := c.FormValue("task")
-	urgency := c.FormValue("category")
+	urgency := c.FormValue("urgency")
 
 	newTask, err := todo.AddUser(task, urgency)
 	if err != nil {
