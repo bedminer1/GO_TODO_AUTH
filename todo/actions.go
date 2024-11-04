@@ -9,6 +9,7 @@ import (
 
 type Task struct {
 	ID          uint `gorm:"primaryKey"`
+	Author      string
 	Task        string
 	Urgency     string
 	Completed   bool
@@ -16,10 +17,11 @@ type Task struct {
 	CompletedAt time.Time
 }
 
-func AddUser(task, urgency string) (Task, error) {
-	newTask := Task {
-		Task: task,
-		Urgency: urgency,
+func AddUser(author, task, urgency string) (Task, error) {
+	newTask := Task{
+		Author: author,
+		Task:      task,
+		Urgency:   urgency,
 		Completed: false,
 		CreatedAt: time.Now(),
 	}
@@ -39,6 +41,5 @@ func AddUser(task, urgency string) (Task, error) {
 
 	return newTask, nil
 }
-
 
 // TODO: delete, mark complete
