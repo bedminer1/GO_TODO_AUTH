@@ -30,11 +30,9 @@ func AddUser(author, task, urgency string) (Task, error) {
 	if err != nil {
 		return newTask, err
 	}
-
 	if err := db.AutoMigrate(&Task{}); err != nil {
 		return newTask, err
 	}
-
 	if err := db.Create(&newTask).Error; err != nil {
 		return newTask, err
 	}

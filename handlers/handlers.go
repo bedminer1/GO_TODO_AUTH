@@ -66,3 +66,8 @@ func HandleComplete(c echo.Context) error {
 func HandleDelete(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
+
+func HandleList(c echo.Context) error {
+	// make sure only viewable if author name matches jwt
+	return nil
+}
