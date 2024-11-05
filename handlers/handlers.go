@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/bedminer1/todo/todo"
@@ -51,7 +52,7 @@ func HandleAdd(c echo.Context) error {
 	claims := user.Claims.(*JwtCustomClaims)
 	author := claims.Name
 
-	newTask, err := todo.AddUser(author, task, urgency)
+	newTask, err := todo.AddTask(author, task, urgency)
 	if err != nil {
 		return err
 	}
@@ -59,11 +60,14 @@ func HandleAdd(c echo.Context) error {
 }
 
 func HandleComplete(c echo.Context) error {
-	task := todo.Task{}
+	id, _ := strconv.Atoi(c.Param("id"))
+	task := todo.CompleteTask(id) 
 	return c.JSON(http.StatusOK, task)
 }
 
 func HandleDelete(c echo.Context) error {
+	id, _ := strconv.Atoi(c.Param("id"))
+	todo.DeleteTask(id) 
 	return c.NoContent(http.StatusNoContent)
 }
 

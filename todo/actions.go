@@ -17,7 +17,19 @@ type Task struct {
 	CompletedAt time.Time
 }
 
-func AddUser(author, task, urgency string) (Task, error) {
+var db *gorm.DB
+
+func InitDB() error {
+	var err error
+	db, err = gorm.Open(sqlite.Open("tasks.db"), &gorm.Config{})
+	if err != nil {
+		return err
+	}
+
+	return db.AutoMigrate(&Task{})
+}
+
+func AddTask(author, task, urgency string) (Task, error) {
 	newTask := Task{
 		Author: author,
 		Task:      task,
@@ -26,18 +38,29 @@ func AddUser(author, task, urgency string) (Task, error) {
 		CreatedAt: time.Now(),
 	}
 
-	db, err := gorm.Open(sqlite.Open("tasks.db"), &gorm.Config{})
-	if err != nil {
-		return newTask, err
-	}
-	if err := db.AutoMigrate(&Task{}); err != nil {
-		return newTask, err
-	}
 	if err := db.Create(&newTask).Error; err != nil {
 		return newTask, err
 	}
 
 	return newTask, nil
+}
+
+func CompleteTask(id int) Task {
+	var task Task
+
+	db.Where("ID=?", id).First(&task)
+	task.Completed = true
+	db.Save(&task)
+
+	return task
+}
+
+func DeleteTask(id int) Task {
+	var task Task
+	db.Where("ID=?", id).First(&task)
+	db.Delete(&task)
+
+	return task
 }
 
 // TODO: delete, mark complete
