@@ -73,5 +73,11 @@ func HandleDelete(c echo.Context) error {
 
 func HandleList(c echo.Context) error {
 	// make sure only viewable if author name matches jwt
-	return nil
+	user := c.Get("user").(*jwt.Token)
+	claims := user.Claims.(*JwtCustomClaims)
+	author := claims.Name
+
+	tasks := todo.ListTasks(author)
+
+	return c.JSON(http.StatusOK, tasks)
 }

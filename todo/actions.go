@@ -31,7 +31,7 @@ func InitDB() error {
 
 func AddTask(author, task, urgency string) (Task, error) {
 	newTask := Task{
-		Author: author,
+		Author:    author,
 		Task:      task,
 		Urgency:   urgency,
 		Completed: false,
@@ -61,6 +61,13 @@ func DeleteTask(id int) Task {
 	db.Delete(&task)
 
 	return task
+}
+
+func ListTasks(author string) []Task {
+	var tasks []Task
+	db.Where("Author=?", author).Find(&tasks)
+
+	return tasks
 }
 
 // TODO: delete, mark complete
