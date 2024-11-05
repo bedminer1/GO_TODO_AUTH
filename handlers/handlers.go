@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -8,6 +9,8 @@ import (
 	"github.com/bedminer1/todo/todo"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v4"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 type JwtCustomClaims struct {
@@ -18,12 +21,33 @@ type JwtCustomClaims struct {
 
 var SecretKey = "f2g(&*kjha12$34%^&*148f6"
 
+type User struct {
+	ID       uint   `gorm:"primaryKey"`
+	Username string `gorm:"uniqueIndex"`
+	Password string
+}
+
 func HandleLogin(c echo.Context) error {
+	db, err := gorm.Open(sqlite.Open("tasks.db"), &gorm.Config{})
+	if err != nil {
+		return err
+	}
+
+	if err := db.AutoMigrate(&User{}); err != nil {
+		return err
+	}
+
+	var user User
+
 	username := c.FormValue("username")
 	password := c.FormValue("password")
 
-	if username != "bed" || password != "bedspassword" {
-		return echo.ErrUnauthorized
+	err = db.Where("username = ? AND password = ?", username, password).First(&user).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return echo.ErrUnauthorized
+		}
+		return err
 	}
 
 	claims := &JwtCustomClaims{
@@ -61,13 +85,13 @@ func HandleAdd(c echo.Context) error {
 
 func HandleComplete(c echo.Context) error {
 	id, _ := strconv.Atoi(c.Param("id"))
-	task := todo.CompleteTask(id) 
+	task := todo.CompleteTask(id)
 	return c.JSON(http.StatusOK, task)
 }
 
 func HandleDelete(c echo.Context) error {
 	id, _ := strconv.Atoi(c.Param("id"))
-	todo.DeleteTask(id) 
+	todo.DeleteTask(id)
 	return c.NoContent(http.StatusNoContent)
 }
 
