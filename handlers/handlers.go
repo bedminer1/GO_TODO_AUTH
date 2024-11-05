@@ -32,13 +32,11 @@ func HandleLogin(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-
 	if err := db.AutoMigrate(&User{}); err != nil {
 		return err
 	}
 
 	var user User
-
 	username := c.FormValue("username")
 	password := c.FormValue("password")
 
@@ -57,7 +55,6 @@ func HandleLogin(c echo.Context) error {
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 72)),
 		},
 	}
-
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	t, err := token.SignedString([]byte(SecretKey))
 	if err != nil {
@@ -78,25 +75,55 @@ func HandleAdd(c echo.Context) error {
 
 	newTask, err := todo.AddTask(author, task, urgency)
 	if err != nil {
-		return err
+		return c.JSON(http.StatusInternalServerError, echo.Map{
+			"error": "internal error occurred while adding the task",
+		})
 	}
 	return c.JSON(http.StatusCreated, newTask)
 }
 
 func HandleComplete(c echo.Context) error {
+	user := c.Get("user").(*jwt.Token)
+	claims := user.Claims.(*JwtCustomClaims)
+	author := claims.Name
 	id, _ := strconv.Atoi(c.Param("id"))
-	task := todo.CompleteTask(id)
+
+	task, err := todo.CompleteTask(id, author)
+	if err != nil {
+		switch {
+		case errors.Is(err, todo.ErrTaskNotFound):
+			return c.JSON(http.StatusNotFound, echo.Map{"error": err.Error()})
+		case errors.Is(err, todo.ErrPermissionDenied):
+			return c.JSON(http.StatusForbidden, echo.Map{"error": err.Error()})
+		default:
+			return c.JSON(http.StatusInternalServerError, echo.Map{"error": "unexpected error occurred"})
+		}
+	}
 	return c.JSON(http.StatusOK, task)
 }
 
 func HandleDelete(c echo.Context) error {
+	user := c.Get("user").(*jwt.Token)
+	claims := user.Claims.(*JwtCustomClaims)
+	author := claims.Name
 	id, _ := strconv.Atoi(c.Param("id"))
-	todo.DeleteTask(id)
+
+	err := todo.DeleteTask(id, author)
+	if err != nil {
+		switch {
+		case errors.Is(err, todo.ErrTaskNotFound):
+			return c.JSON(http.StatusNotFound, echo.Map{"error": err.Error()})
+		case errors.Is(err, todo.ErrPermissionDenied):
+			return c.JSON(http.StatusForbidden, echo.Map{"error": err.Error()})
+		default:
+			return c.JSON(http.StatusInternalServerError, echo.Map{"error": "unexpected error occurred"})
+		}
+	}
+
 	return c.NoContent(http.StatusNoContent)
 }
 
 func HandleList(c echo.Context) error {
-	// make sure only viewable if author name matches jwt
 	user := c.Get("user").(*jwt.Token)
 	claims := user.Claims.(*JwtCustomClaims)
 	author := claims.Name
