@@ -29,10 +29,6 @@ func NewHandler(t *todo.TodoService, db *gorm.DB) *Handler {
 	return &Handler{T: t, DB: db}
 }
 
-// func (h *Handler) HandleChangeName(c echo.Context) error {
-
-// }
-
 func (h *Handler) HandleAdd(c echo.Context) error {
 	task := c.FormValue("task")
 	urgency := c.FormValue("urgency")

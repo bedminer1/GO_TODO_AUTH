@@ -84,10 +84,14 @@ func (t *TodoService) DeleteTask(id int, author string) error {
 }
 
 func (t *TodoService) ListTasks(author string) []models.Task {
-	var tasks []models.Task
-	t.DB.Where("Author=?", author).Find(&tasks)
-
+	var (
+		tasks []models.Task
+		user models.User
+	)
+	t.DB.Where("username = ?", author).First(&user)
+	t.DB.Model(&models.Task{}).Joins("LEFT JOIN task_viewers ON task_viewers.task_id = tasks.id").
+	Where("tasks.author = ? OR task_viewers.user_id = ?", user.Username, user.ID).
+	Find(&tasks)
+	
 	return tasks
 }
-
-// TODO: delete, mark complete

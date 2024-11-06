@@ -6,11 +6,11 @@ import (
 	"net/http"
 	"time"
 
-	"golang.org/x/crypto/bcrypt"
 	"github.com/bedminer1/todo/models"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
@@ -57,6 +57,14 @@ func generateToken(username string) (string, error) {
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(SecretKey))
+}
+
+func getCurrentUserName(c echo.Context) string {
+	u := c.Get("user").(*jwt.Token)
+	claims := u.Claims.(*JwtCustomClaims)
+	name := claims.Name
+
+	return name
 }
 
 func (h *Handler) HandleLogin(c echo.Context) error {
@@ -133,7 +141,7 @@ func (h *Handler) HandleSignup(c echo.Context) error {
 
 	err := h.DB.Where("username = ?", username).First(&models.User{}).Error
 	if err != nil {
-		if !errors.Is(err, gorm.ErrRecordNotFound){
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return c.JSON(http.StatusBadRequest, "user already exists")
 		}
 	}
@@ -158,19 +166,47 @@ func (h *Handler) HandleSignup(c echo.Context) error {
 	})
 }
 
-// func (h *Handler) HandleGiveReadPermissions(c echo.Context) error {
+func (h *Handler) HandleGiveReadPermissions(c echo.Context) error {
+	taskID := c.Param("task_id")
+	viewerID := c.FormValue("viewer_id")
 
-// }
+	var task models.Task
+	if err := h.DB.First(&task, "id = ?", taskID).Error; err != nil {
+		return echo.ErrNotFound
+	}
+
+	currentUserID := getCurrentUserName(c)
+	if task.Author != currentUserID {
+		return echo.ErrUnauthorized
+	}
+
+	var viewer models.User
+    if err := h.DB.First(&viewer, "id = ?", viewerID).Error; err != nil {
+        return echo.ErrNotFound
+    }
+
+	if err := h.DB.Model(&task).Association("Viewers").Append(&viewer); err != nil {
+        return err
+    }
+
+	fmt.Println(task)
+
+	return c.JSON(http.StatusOK, echo.Map{
+		"message": "Viewer added successfully",
+	})
+}
 
 // func (h *Handler) HandleRemoveReadPermissions(c echo.Context) error {
 
 // }
 
+
 func (h *Handler) JwtMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		user := c.Get("user").(*jwt.Token)
 		claims := user.Claims.(*JwtCustomClaims)
-
+		
+		// check blacklist
 		isBlacklisted, err := isTokenBlacklisted(claims.ID, h.DB)
 		if err != nil {
 			return echo.ErrInternalServerError
