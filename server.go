@@ -13,11 +13,14 @@ import (
 func main() {
 	e := echo.New()
 
-	if err := todo.InitDB(); err != nil {
+	// Initialize DB and create handler
+	db, err := todo.InitDB()
+	if err != nil {
 		log.Fatalf("Could not init db: %v", err)
 	}
+	h := handlers.NewHandler(db)
 
-	e.POST("/login", handlers.HandleLogin)
+	e.POST("/login", h.HandleLogin)
 
 	r := e.Group("/auth")
 	config := echojwt.Config{

@@ -8,8 +8,8 @@ import (
 
 	"github.com/bedminer1/todo/todo"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -21,26 +21,21 @@ type JwtCustomClaims struct {
 
 var SecretKey = "f2g(&*kjha12$34%^&*148f6"
 
-type User struct {
-	ID       uint   `gorm:"primaryKey"`
-	Username string `gorm:"uniqueIndex"`
-	Password string
+// for database injection
+type Handler struct {
+	db *gorm.DB
 }
 
-func HandleLogin(c echo.Context) error {
-	db, err := gorm.Open(sqlite.Open("tasks.db"), &gorm.Config{})
-	if err != nil {
-		return err
-	}
-	if err := db.AutoMigrate(&User{}); err != nil {
-		return err
-	}
+func NewHandler(db *gorm.DB) *Handler {
+	return &Handler{db: db}
+}
 
-	var user User
+func (h *Handler) HandleLogin(c echo.Context) error {
+	var user todo.User
 	username := c.FormValue("username")
 	password := c.FormValue("password")
 
-	err = db.Where("username = ? AND password = ?", username, password).First(&user).Error
+	err := h.db.Where("username = ? AND password = ?", username, password).First(&user).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return echo.ErrUnauthorized
@@ -53,6 +48,7 @@ func HandleLogin(c echo.Context) error {
 		true,
 		jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 72)),
+			ID:        uuid.NewString(),
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)

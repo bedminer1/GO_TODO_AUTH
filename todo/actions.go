@@ -19,6 +19,12 @@ type Task struct {
 	CompletedAt time.Time
 }
 
+type User struct {
+	ID       uint   `gorm:"primaryKey"`
+	Username string `gorm:"uniqueIndex"`
+	Password string
+}
+
 var db *gorm.DB
 
 var (
@@ -26,15 +32,17 @@ var (
 	ErrPermissionDenied = errors.New("permission denied")
 )
 
-func InitDB() error {
-	var err error
-	db, err = gorm.Open(sqlite.Open("tasks.db"), &gorm.Config{})
+func InitDB() (*gorm.DB, error) {
+	db, err := gorm.Open(sqlite.Open("tasks.db"), &gorm.Config{})
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	return db.AutoMigrate(&Task{})
+	if err := db.AutoMigrate(&Task{}); err != nil {
+		return nil, err
+	}
+	return db, nil
 }
+
 
 func AddTask(author, task, urgency string) (Task, error) {
 	newTask := Task{
