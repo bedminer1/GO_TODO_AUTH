@@ -16,7 +16,7 @@ type User struct {
 }
 
 type Task struct {
-	ID          uint `gorm:"primaryKey"`
+	ID          string `gorm:"primaryKey"`
 	Author      string
 	Task        string
 	Urgency     string

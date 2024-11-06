@@ -41,6 +41,7 @@ func main() {
 	h := handlers.NewHandler(t, db)
 
 	e.POST("/login", h.HandleLogin)
+	e.POST("/signup", h.HandleSignup)
 
 	r := e.Group("/auth")
 	config := echojwt.Config{

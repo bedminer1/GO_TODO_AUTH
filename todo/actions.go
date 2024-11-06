@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/bedminer1/todo/models"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -24,6 +25,7 @@ func NewTodoService(db *gorm.DB) *TodoService {
 
 func (t *TodoService) AddTask(author, task, urgency string) (models.Task, error) {
 	newTask := models.Task{
+		ID:        uuid.NewString(),
 		Author:    author,
 		Task:      task,
 		Urgency:   urgency,
