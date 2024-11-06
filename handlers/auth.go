@@ -63,11 +63,14 @@ func (h *Handler) HandleLogin(c echo.Context) error {
 	var user models.User
 	username := c.FormValue("username")
 	password := c.FormValue("password")
-	// TODO: encrypt password
-	encryptedPassword := encryptPassword(password)
 
-	err := h.DB.Where("username = ? AND password = ?", username, encryptedPassword).First(&user).Error
+	err := h.DB.Where("username = ?", username).First(&user).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return echo.ErrUnauthorized
+	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
+	if err != nil {
 		return echo.ErrUnauthorized
 	}
 
