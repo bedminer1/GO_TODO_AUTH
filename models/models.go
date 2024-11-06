@@ -9,9 +9,10 @@ type BlacklistedToken struct {
 }
 
 type User struct {
-	ID       string `gorm:"primaryKey"`
-	Username string `gorm:"unique; not null"`
-	Password string `gorm:"not null"`
+	ID        string `gorm:"primaryKey"`
+	Username  string `gorm:"unique; not null"`
+	Password  string `gorm:"not null"`
+	ActiveJWT string
 }
 
 type Task struct {

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/bedminer1/todo/models"
@@ -23,35 +22,6 @@ type JwtCustomClaims struct {
 
 const SecretKey = "f2g(&*kjha12$34%^&*148f6"
 
-var (
-	blacklist      = make(map[string]time.Time)
-	blacklistMutex sync.RWMutex
-)
-
-func AddTokenToBlacklist(tokenID string, expiration time.Time) {
-	blacklistMutex.Lock()
-	defer blacklistMutex.Unlock()
-	blacklist[tokenID] = expiration
-}
-
-func IsTokenBlacklisted(tokenID string) bool {
-	blacklistMutex.RLock()
-	defer blacklistMutex.RUnlock()
-	expiration, found := blacklist[tokenID]
-	if !found {
-		return false
-	}
-
-	// remove expired tokens
-	if time.Now().After(expiration) {
-		blacklistMutex.Lock()
-		delete(blacklist, tokenID)
-		blacklistMutex.Unlock()
-		return false
-	}
-	return true
-}
-
 // for database injection
 type Handler struct {
 	DB *gorm.DB
@@ -62,17 +32,59 @@ func NewHandler(t *todo.TodoService, db *gorm.DB) *Handler {
 	return &Handler{T: t, DB: db}
 }
 
+func addTokenToBlackList(tokenID, user string, expiration time.Time, db *gorm.DB) error {
+	token := models.BlacklistedToken{
+		ID:         tokenID,
+		User:       user,
+		Expiration: expiration,
+	}
+	cleanupExpiredTokens(db)
+	return db.Create(&token).Error
+}
+
+func isTokenBlacklisted(tokenID string, db *gorm.DB) (bool, error) {
+	var token models.BlacklistedToken
+	err := db.Where("id = ? AND expiration > ?", tokenID, time.Now()).First(&token).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, nil
+	}
+
+	return err == nil, err
+}
+
+func cleanupExpiredTokens(db *gorm.DB) error {
+	return db.Where("expiration < ?", time.Now()).Delete(&models.BlacklistedToken{}).Error
+}
+
 func (h *Handler) HandleLogin(c echo.Context) error {
 	var user models.User
 	username := c.FormValue("username")
 	password := c.FormValue("password")
 
 	err := h.DB.Where("username = ? AND password = ?", username, password).First(&user).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return echo.ErrUnauthorized
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return echo.ErrUnauthorized
+	}
+
+	// has active jwt
+	if user.ActiveJWT != "" {
+		token, err := jwt.ParseWithClaims(user.ActiveJWT, &JwtCustomClaims{}, func(token *jwt.Token) (interface{}, error) {
+			return []byte(SecretKey), nil
+		})
+
+		if err == nil {
+			if claims, ok := token.Claims.(*JwtCustomClaims); ok && token.Valid {
+				if time.Until(claims.ExpiresAt.Time) > 24*time.Hour {
+					return c.JSON(http.StatusOK, echo.Map{
+						"token": user.ActiveJWT,
+					})
+				} else {
+					addTokenToBlackList(claims.ID, claims.Name, claims.ExpiresAt.Time, h.DB)
+				}
+			}
+
 		}
-		return err
+
 	}
 
 	claims := &JwtCustomClaims{
@@ -89,33 +101,14 @@ func (h *Handler) HandleLogin(c echo.Context) error {
 		return err
 	}
 
+	user.ActiveJWT = t
+	if err := h.DB.Save(&user).Error; err != nil {
+		return c.JSON(http.StatusInternalServerError, "error saving token")
+	}
+
 	return c.JSON(http.StatusOK, echo.Map{
 		"token": t,
 	})
-}
-
-func addTokenToBlackList(tokenID, user string, expiration time.Time, db *gorm.DB) error {
-	token := models.BlacklistedToken{
-		ID:         tokenID,
-		User:       user,
-		Expiration: expiration,
-	}
-	cleanupExpiredTokens(db)
-	return db.Create(&token).Error
-}
-
-func isTokenBlacklisted(tokenID string, db *gorm.DB) (bool, error) {
-	var token models.BlacklistedToken
-	err := db.Where("id = ? AND expiration > ?", tokenID, time.Now()).First(&token).Error
-	if err == gorm.ErrRecordNotFound {
-		return false, nil
-	}
-
-	return err == nil, err
-}
-
-func cleanupExpiredTokens(db *gorm.DB) error {
-	return db.Where("expiration < ?", time.Now()).Delete(&models.BlacklistedToken{}).Error
 }
 
 func (h *Handler) HandleLogout(c echo.Context) error {

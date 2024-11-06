@@ -11,12 +11,15 @@ import (
 	"github.com/labstack/echo/v4"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 var db *gorm.DB
 
 func InitDB() *gorm.DB {
-	database, err := gorm.Open(sqlite.Open("tasks.db"), &gorm.Config{})
+	database, err := gorm.Open(sqlite.Open("tasks.db"), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Silent),
+	})
 	if err != nil {
 		log.Fatalf("failed to connect to database")
 	}
@@ -34,7 +37,6 @@ func main() {
 
 	// Initialize DB and create handler
 	db = InitDB()
-	
 	t := todo.NewTodoService(db)
 	h := handlers.NewHandler(t, db)
 
