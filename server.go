@@ -48,7 +48,7 @@ func main() {
 		SigningKey: []byte(handlers.SecretKey),
 	}
 	r.Use(echojwt.WithConfig(config))
-	r.Use(handlers.JwtMiddleware)
+	r.Use(h.JwtMiddleware)
 	r.POST("/logout", h.HandleLogout)
 	r.GET("/tasks", h.HandleList)
 	r.POST("/tasks", h.HandleAdd)

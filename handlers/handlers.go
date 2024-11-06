@@ -55,7 +55,7 @@ func IsTokenBlacklisted(tokenID string) bool {
 // for database injection
 type Handler struct {
 	DB *gorm.DB
-	T *todo.TodoService
+	T  *todo.TodoService
 }
 
 func NewHandler(t *todo.TodoService, db *gorm.DB) *Handler {
@@ -94,26 +94,55 @@ func (h *Handler) HandleLogin(c echo.Context) error {
 	})
 }
 
+func addTokenToBlackList(tokenID, user string, expiration time.Time, db *gorm.DB) error {
+	token := models.BlacklistedToken{
+		ID:         tokenID,
+		User:       user,
+		Expiration: expiration,
+	}
+	cleanupExpiredTokens(db)
+	return db.Create(&token).Error
+}
+
+func isTokenBlacklisted(tokenID string, db *gorm.DB) (bool, error) {
+	var token models.BlacklistedToken
+	err := db.Where("id = ? AND expiration > ?", tokenID, time.Now()).First(&token).Error
+	if err == gorm.ErrRecordNotFound {
+		return false, nil
+	}
+
+	return err == nil, err
+}
+
+func cleanupExpiredTokens(db *gorm.DB) error {
+	return db.Where("expiration < ?", time.Now()).Delete(&models.BlacklistedToken{}).Error
+}
+
 func (h *Handler) HandleLogout(c echo.Context) error {
 	user := c.Get("user").(*jwt.Token)
 	claims := user.Claims.(*JwtCustomClaims)
-	jti := claims.ID
 
-	AddTokenToBlacklist(jti, claims.ExpiresAt.Time)
+	err := addTokenToBlackList(claims.ID, claims.Name, claims.ExpiresAt.Time, h.DB)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to blacklist token")
+	}
 
 	return c.JSON(http.StatusOK, echo.Map{
 		"message": "Successfully logged out",
 	})
 }
 
-func JwtMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
+func (h *Handler) JwtMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		user := c.Get("user").(*jwt.Token)
 		claims := user.Claims.(*JwtCustomClaims)
 
-		// Check if token is blacklisted
-		if IsTokenBlacklisted(claims.ID) {
-			return echo.NewHTTPError(http.StatusUnauthorized, "user has been logged out")
+		isBlacklisted, err := isTokenBlacklisted(claims.ID, h.DB)
+		if err != nil {
+			return echo.ErrInternalServerError
+		}
+		if isBlacklisted {
+			return echo.ErrUnauthorized
 		}
 
 		return next(c)
